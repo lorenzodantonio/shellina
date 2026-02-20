@@ -135,11 +135,17 @@ void shell_run(struct shell *shell) {
     if (builtin != NULL) {
       if (builtin(shell, arg_count, args) != 0) {
         perror(args[0]);
-        continue;
+        // continue;
       }
     } else {
       exec(fork(), args);
     }
+
+    for (size_t i = 0; i < arg_count; i++) {
+      free(args[i]);
+    }
+    free(args);
   }
+
   free(line);
 }
