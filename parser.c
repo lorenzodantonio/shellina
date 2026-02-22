@@ -17,29 +17,47 @@ void parser_free(struct parser *p) {
   free(p);
 }
 
+char *parser_next(struct parser *p) {
+  while (isspace(*p->cursor)) {
+    p->cursor++;
+  }
+
+  if (!*p->cursor) {
+    return NULL;
+  }
+
+  int tlen = 0;
+  char *token = malloc(512);
+  while (*p->cursor) {
+    if (*p->cursor == '\"') {
+      p->state = (p->state == STATE_NORMAL) ? STATE_IN_QUOTE : STATE_NORMAL;
+      p->cursor++;
+      continue;
+    }
+
+    if (p->state == STATE_NORMAL && isspace(*p->cursor)) {
+      break;
+    }
+
+    token[tlen++] = *p->cursor++;
+  }
+
+  if (p->state == STATE_IN_QUOTE) {
+    fprintf(stderr, "unclosed \"");
+  }
+
+  token[tlen] = '\0';
+  return token;
+}
+
 char **tokenize(char *line, size_t *arg_count) {
   struct parser parser = {.line = line, .cursor = line, .state = STATE_NORMAL};
-  char **argv = malloc(sizeof(char *) * 512);
+  char **argv = malloc(sizeof(char *) * 64);
 
-  char *start;
-  while (parser.cursor[0] != '\0') {
-    if (!isspace(*parser.cursor)) {
-      start = parser.cursor;
-      while (*parser.cursor != '\0' && !isspace(*parser.cursor)) {
-        parser.cursor++;
-      }
-
-      size_t len = parser.cursor - start;
-      char *str = malloc(len + 1);
-      memcpy(str, start, len);
-      str[len] = '\0';
-
-      argv[(*arg_count)++] = str;
-    } else {
-      start = ++parser.cursor;
-    }
+  char *token;
+  while ((token = parser_next(&parser)) != NULL) {
+    argv[(*arg_count)++] = token;
   }
-  argv[*arg_count] = NULL;
 
   return argv;
 }
