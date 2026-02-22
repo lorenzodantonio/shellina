@@ -10,26 +10,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-// void tokenize(char *line, char *args[], size_t *arg_count) {
-//   char *cursor = line;
-//   *arg_count = 0;
-//   while (cursor[0] != '\0') {
-//     if (!isspace(cursor[0])) {
-//       args[(*arg_count)++] = cursor;
-//       while (cursor[0] != '\0' && !isspace(cursor[0])) {
-//         cursor++;
-//       }
-//       if (*cursor != '\0') {
-//         *cursor = '\0';
-//         cursor++;
-//       }
-//     } else {
-//       cursor++;
-//     }
-//   }
-//   args[*arg_count] = NULL;
-// }
-
 struct shell *shell_new(void) {
   struct shell *s = malloc(sizeof(*s));
   s->history = history_new(1024);
