@@ -57,6 +57,8 @@ void shell_history_restore(struct shell *shell) {
     size = 0;
     nread = 0;
   }
+
+  fclose(f);
 }
 
 void shell_history_append(struct shell *shell, char *cmd) {
@@ -71,7 +73,7 @@ void shell_history_append(struct shell *shell, char *cmd) {
   fclose(f);
 }
 
-void exec(pid_t pid, char **argv) {
+void handle_execpv(pid_t pid, char **argv) {
   if (pid < 0) {
     exit(EXIT_FAILURE);
   } else if (pid == 0) {
@@ -81,6 +83,46 @@ void exec(pid_t pid, char **argv) {
     _exit(EXIT_FAILURE);
   } else {
     wait(NULL);
+  }
+}
+
+void run_cmd(struct shell *shell, struct ast_node *cmd) {
+  builtin_func builtin = builtins_get(cmd->data.args[0]);
+
+  if (builtin != NULL) {
+    size_t argc = 0;
+    while (cmd->data.args[argc] != NULL) {
+      argc++;
+    }
+
+    if (builtin(shell, argc, cmd->data.args) != 0) {
+      perror(cmd->data.args[0]);
+    }
+    return;
+  }
+
+  pid_t pid = fork();
+  char **args = cmd->data.args;
+  if (pid < 0) {
+    exit(EXIT_FAILURE);
+  } else if (pid == 0) {
+    execvp(args[0], args); // on success; does not return to the caller
+    // so if here; an error occurred
+    perror(args[0]);
+    _exit(EXIT_FAILURE);
+  } else {
+    wait(NULL);
+  }
+}
+
+void ast_exec(struct shell *shell, struct ast_node *ast) {
+  switch (ast->type) {
+  case AST_NODE_CMD:
+    run_cmd(shell, ast);
+    break;
+  case AST_NODE_PIPE:
+    fprintf(stderr, "pipe not implemented\n");
+    break;
   }
 }
 
@@ -102,30 +144,32 @@ void shell_run(struct shell *shell) {
     }
 
     if (line[0] == '\0') {
+      // free(line);
       continue;
     }
 
     shell_history_append(shell, line);
 
-    size_t arg_count = 0;
-    char **args = tokenize(line, &arg_count);
+    struct token_list *token_lst = tokenize(line);
 
-    builtin_func builtin = builtins_get(args[0]);
-    (void)builtin;
-    if (builtin != NULL) {
-      if (builtin(shell, arg_count, args) != 0) {
-        perror(args[0]);
-        // continue;
-      }
-    } else {
-      exec(fork(), args);
+    if (token_lst->count == 0) {
+      continue;
     }
 
-    for (size_t i = 0; i < arg_count; i++) {
-      free(args[i]);
+    for (size_t i = 0; i < token_lst->count; i++) {
+      printf("%zu - type: %d - value: %s\n", i, token_lst->tokens[i]->type,
+             token_lst->tokens[i]->str);
     }
-    free(args);
+
+    struct ast_node *ast = parse(token_lst, 0, token_lst->count);
+    ast_exec(shell, ast);
+    ast_free(ast);
+
+    for (size_t k = 0; k < token_lst->count; k++) {
+      token_free(token_lst->tokens[k]);
+    }
+    free(token_lst->tokens);
+    free(token_lst);
   }
-
   free(line);
 }
