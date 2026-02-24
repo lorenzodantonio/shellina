@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "params.h" // TODO
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,7 +40,7 @@ void lexer_free(struct lexer *l) {
   free(l);
 }
 
-struct token *lexer_next(struct lexer *l) {
+struct token *lexer_next(struct lexer *l, struct param_registry *params) {
   while (isspace(*l->cursor)) {
     l->cursor++;
   }
@@ -63,6 +64,30 @@ struct token *lexer_next(struct lexer *l) {
       continue;
     }
 
+    if (*l->cursor == '$' && isalnum(*(l->cursor + 1))) {
+      char *start = ++l->cursor; // skip $
+      while (isalnum(*l->cursor) || *l->cursor == '_') {
+        l->cursor++;
+      }
+      size_t param_len = l->cursor - start;
+      if (param_len < 1) {
+        l->cursor++;
+        continue;
+      }
+      char *param_name = malloc(param_len + 1);
+      memcpy(param_name, start, param_len);
+      param_name[param_len] = '\0';
+
+      struct param *param = param_registry_find(params, param_name);
+      if (param) {
+        tlen += snprintf(tstr + tlen, sizeof(tstr) - tlen, "%s", param->value);
+      } else {
+        fprintf(stderr, "parameter expansion error\n");
+      }
+
+      free(param_name);
+    }
+
     if (l->state == STATE_NORMAL &&
         (isspace(*l->cursor) || *l->cursor == '|')) {
       break;
@@ -79,7 +104,7 @@ struct token *lexer_next(struct lexer *l) {
   return token_new(TOKEN_WORD, tstr);
 }
 
-struct token_list *tokenize(char *line) {
+struct token_list *tokenize(char *line, struct param_registry *params) {
   struct lexer lexer = {.line = line, .cursor = line, .state = STATE_NORMAL};
 
   struct token_list *lst = malloc(sizeof(*lst));
@@ -89,7 +114,7 @@ struct token_list *tokenize(char *line) {
   lst->capacity = lst_initcap;
   lst->tokens = malloc(sizeof(*lst->tokens) * lst_initcap);
 
-  for (struct token *t; (t = lexer_next(&lexer)) != NULL;
+  for (struct token *t; (t = lexer_next(&lexer, params)) != NULL;
        token_list_push(lst, t))
     ;
 

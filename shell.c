@@ -157,7 +157,7 @@ void shell_run(struct shell *shell) {
 
     shell_history_append(shell, line);
 
-    struct token_list *token_lst = tokenize(line);
+    struct token_list *token_lst = tokenize(line, shell->param_registry);
 
     if (token_lst->count == 0) {
       continue;
