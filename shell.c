@@ -12,6 +12,8 @@
 
 struct shell *shell_new(void) {
   struct shell *s = malloc(sizeof(*s));
+
+  s->param_registry = param_registry_new(1024);
   s->history = history_new(1024);
   s->running = true;
   return s;
@@ -19,6 +21,7 @@ struct shell *shell_new(void) {
 
 void shell_free(struct shell *shell) {
   history_free(shell->history);
+  param_registry_free(shell->param_registry);
   free(shell);
 }
 
@@ -123,6 +126,10 @@ void ast_exec(struct shell *shell, struct ast_node *ast) {
   case AST_NODE_PIPE:
     fprintf(stderr, "pipe not implemented\n");
     break;
+  case AST_NODE_ASSIGNMENT:
+    param_registry_set(shell->param_registry, ast->data.assignment.label,
+                       ast->data.assignment.value);
+    break;
   }
 }
 
@@ -154,11 +161,6 @@ void shell_run(struct shell *shell) {
 
     if (token_lst->count == 0) {
       continue;
-    }
-
-    for (size_t i = 0; i < token_lst->count; i++) {
-      printf("%zu - type: %d - value: %s\n", i, token_lst->tokens[i]->type,
-             token_lst->tokens[i]->str);
     }
 
     struct ast_node *ast = parse(token_lst, 0, token_lst->count);

@@ -1,6 +1,8 @@
 #pragma once
 
-struct shell;
+#include "shell.h"
+
+// struct shell;
 
 typedef int (*builtin_func)(struct shell *shell, int argc, char **argv);
 
@@ -14,3 +16,4 @@ builtin_func builtins_get(char *name);
 int noop(struct shell *shell, int argc, char **argv);
 int quit(struct shell *shell, int argc, char **argv);
 int cd(struct shell *shell, int argc, char **argv);
+int export(struct shell *shell, int argc, char **argv);

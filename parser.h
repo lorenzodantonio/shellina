@@ -38,6 +38,7 @@ struct token_list *tokenize(char *line);
 enum ast_node_type {
   AST_NODE_CMD,
   AST_NODE_PIPE,
+  AST_NODE_ASSIGNMENT,
 };
 
 struct parser {
@@ -49,6 +50,10 @@ struct ast_node {
   enum ast_node_type type;
   union {
     char **args;
+    struct {
+      char *label;
+      char *value;
+    } assignment;
     struct {
       struct ast_node *left;
       struct ast_node *right;
