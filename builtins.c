@@ -1,4 +1,5 @@
 #include "builtins.h"
+#include "params.h"
 #include "shell.h"
 
 #include <stdbool.h>
@@ -36,11 +37,46 @@ int cd(struct shell *shell, int argc, char **argv) {
   return chdir(argv[1]);
 }
 
+int export(struct shell *shell, int argc, char **argv) {
+  if (argc == 1) {
+    for (size_t i = 0; i < shell->param_registry->count; i++) {
+      printf("%s: %s\n", shell->param_registry->vars[i].label,
+             shell->param_registry->vars[i].value);
+    }
+    return 0;
+  }
+  if (argc == 2) {
+    char *eq = strchr(argv[1], '=');
+    *eq = '\0';
+    param_registry_set(shell->param_registry, argv[1], eq + 1);
+
+    return 0;
+  }
+  fprintf(stderr, "wrong arg count\n");
+  return -1;
+}
+
+static struct builtin builtins[];
+
+int set(struct shell *shell, int argc, char **argv) {
+  (void)argc;
+  (void)argv;
+
+  for (size_t i = 0; i < shell->param_registry->count; i++) {
+    printf("%s\n", shell->param_registry->vars[i].label);
+  }
+
+  size_t k = 0;
+  while (builtins[k].name != NULL) {
+    printf("%s\n", builtins[k].name);
+    k++;
+  }
+  return 0;
+}
+
 static struct builtin builtins[] = {
-    {":", noop},
-    {"cd", cd},
-    {"exit", quit},
-    {NULL, NULL},
+    {":", noop},    {"cd", cd},   {"export", export},
+    {"exit", quit}, {"set", set}, {NULL, NULL},
 };
 
 builtin_func builtins_get(char *name) {

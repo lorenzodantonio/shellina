@@ -1,11 +1,13 @@
 #pragma once
 
 #include "history.h"
+#include "params.h"
 #include <stdbool.h>
 #include <stdlib.h>
 
 struct shell {
   struct history *history;
+  struct param_registry *param_registry;
   bool running;
 };
 

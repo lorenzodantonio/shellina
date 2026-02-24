@@ -124,6 +124,11 @@ void ast_free(struct ast_node *node) {
     ast_free(node->data.child.right);
     free(node);
     break;
+  case AST_NODE_ASSIGNMENT:
+    free(node->data.assignment.label);
+    free(node->data.assignment.value);
+    free(node);
+    break;
   }
 }
 
@@ -139,17 +144,31 @@ struct ast_node *parse_command(struct token_list *lst, size_t start,
   return n;
 }
 
+struct ast_node *parse_assignment(struct token_list *lst, size_t start) {
+  struct ast_node *n = ast_node_new(AST_NODE_ASSIGNMENT);
+  char *str = lst->tokens[start]->str;
+  char *eq = strchr(str, '=');
+  *eq = '\0';
+
+  n->data.assignment.label = strdup(str);
+  n->data.assignment.value = strdup(eq + 1);
+
+  return n;
+}
+
 struct ast_node *parse(struct token_list *lst, size_t start, size_t end) {
-  size_t i = start;
-  while (i < lst->count && lst->tokens[i]->type == TOKEN_WORD) {
-    i++;
-  }
-  if (i == lst->count) {
-    return parse_command(lst, start, start + i);
+  for (size_t i = start; i < end; i++) {
+    if (lst->tokens[i]->type == TOKEN_PIPE) {
+      struct ast_node *n = ast_node_new(AST_NODE_PIPE);
+      n->data.child.left = parse_command(lst, start, i);
+      n->data.child.right = parse(lst, i + 1, end);
+      return n;
+    }
   }
 
-  struct ast_node *n = ast_node_new(AST_NODE_PIPE);
-  n->data.child.left = parse_command(lst, start, i);
-  n->data.child.right = parse(lst, i + 1, end);
-  return n;
+  if ((end - start) == 1 && strchr(lst->tokens[start]->str, '=') != NULL) {
+    return parse_assignment(lst, start);
+  }
+
+  return parse_command(lst, start, end);
 }
