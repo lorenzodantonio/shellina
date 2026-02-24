@@ -5,7 +5,7 @@
 struct param_registry *param_registry_new(size_t initial_capacity) {
   struct param_registry *registry = malloc(sizeof(*registry));
 
-  registry->vars = malloc(sizeof(struct param *) * initial_capacity);
+  registry->vars = malloc(sizeof(struct param) * initial_capacity);
   registry->count = 0;
   registry->capacity = initial_capacity;
 
