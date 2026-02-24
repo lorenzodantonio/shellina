@@ -117,6 +117,36 @@ void run_cmd(struct shell *shell, struct ast_node *cmd) {
     wait(NULL);
   }
 }
+void ast_exec(struct shell *shell, struct ast_node *p);
+void run_pipe(struct shell *shell, struct ast_node *p) {
+  int fd[2];
+  if (pipe(fd) == -1) {
+    perror("pipe");
+    return;
+  }
+
+  pid_t p1 = fork();
+  if (p1 == 0) {
+    dup2(fd[1], STDOUT_FILENO);
+    close(fd[0]);
+    close(fd[1]);
+    ast_exec(shell, p->data.child.left);
+    exit(0);
+  }
+
+  pid_t p2 = fork();
+  if (p2 == 0) {
+    dup2(fd[0], STDIN_FILENO);
+    close(fd[0]);
+    close(fd[1]);
+    ast_exec(shell, p->data.child.right);
+    exit(0);
+  }
+  close(fd[0]);
+  close(fd[1]);
+  wait(NULL);
+  wait(NULL);
+}
 
 void ast_exec(struct shell *shell, struct ast_node *ast) {
   switch (ast->type) {
@@ -124,7 +154,7 @@ void ast_exec(struct shell *shell, struct ast_node *ast) {
     run_cmd(shell, ast);
     break;
   case AST_NODE_PIPE:
-    fprintf(stderr, "pipe not implemented\n");
+    run_pipe(shell, ast);
     break;
   case AST_NODE_ASSIGNMENT:
     param_registry_set(shell->param_registry, ast->data.assignment.label,
