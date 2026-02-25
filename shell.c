@@ -8,11 +8,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <termios.h>
 #include <unistd.h>
+
+struct termios term;
 
 struct shell *shell_new(void) {
   struct shell *s = malloc(sizeof(*s));
 
+  s->raw_mode = false;
   s->param_registry = param_registry_new(1024);
   s->history = history_new(1024);
   s->running = true;
@@ -24,6 +28,21 @@ void shell_free(struct shell *shell) {
   param_registry_free(shell->param_registry);
   free(shell);
 }
+
+void set_raw_mode(void);
+void set_canonical_mode(void);
+
+void set_raw_mode(void) {
+  tcgetattr(STDIN_FILENO, &term);
+  atexit(set_canonical_mode); // reset at exit
+
+  struct termios raw = term;
+  raw.c_lflag &=
+      ~(ECHO | ICANON | ISIG); // No echo, no line buffer, no signals (Ctrl+C)
+  tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+}
+
+void set_canonical_mode(void) { tcsetattr(STDIN_FILENO, TCSAFLUSH, &term); }
 
 void shell_history_restore(struct shell *shell) {
   FILE *f = fopen(".history.log", "r");
@@ -117,7 +136,9 @@ void run_cmd(struct shell *shell, struct ast_node *cmd) {
     wait(NULL);
   }
 }
+
 void ast_exec(struct shell *shell, struct ast_node *p);
+
 void run_pipe(struct shell *shell, struct ast_node *p) {
   int fd[2];
   if (pipe(fd) == -1) {
@@ -164,20 +185,91 @@ void ast_exec(struct shell *shell, struct ast_node *ast) {
 }
 
 void shell_run(struct shell *shell) {
-  char *line = NULL;
-  size_t len = 0;
-
+  char line[4096];
   while (shell->running) {
     printf("%s> ", getcwd(NULL, 0));
     fflush(stdout);
 
-    ssize_t line_len = getline(&line, &len, stdin);
-    if (line_len < 1) {
-      shell->running = false;
+    size_t pos = 0;
+    char c;
+    (void)shell;
+
+    set_raw_mode();
+    while (read(0, &c, 1) == 1 && c != '\n' && c != 4) {
+      if (c == '\x1b') {
+        char seq[2];
+        if ((read(0, &seq[0], 1) == 1) && (read(0, &seq[1], 1) == 1)) {
+          switch (seq[1]) {
+          case 'A':
+            if (shell->history->count > 0) {
+              if (shell->history_viewer.active &&
+                  shell->history_viewer.cursor > 1) {
+                shell->history_viewer.cursor--;
+              } else {
+                shell->history_viewer.active = true;
+                shell->history_viewer.cursor = shell->history->count;
+              }
+              write(1, "\r\x1b[K", 4); // clear
+
+              printf("%s> ", getcwd(NULL, 0));
+              fflush(stdout);
+
+              char *cmd =
+                  shell->history->commands[shell->history_viewer.cursor - 1];
+
+              strcpy(line, cmd);
+              pos = strlen(line);
+              write(1, line, pos);
+            }
+            break;
+          case 'B':
+            if (shell->history->count > 0) {
+              if (shell->history_viewer.active) {
+                if (shell->history_viewer.cursor < shell->history->count) {
+                  shell->history_viewer.cursor++;
+                } else {
+                  shell->history_viewer.cursor = 1;
+                }
+              }
+
+              write(1, "\r\x1b[K", 4); // clear
+
+              printf("%s> ", getcwd(NULL, 0));
+              fflush(stdout);
+
+              char *cmd =
+                  shell->history->commands[shell->history_viewer.cursor - 1];
+
+              strcpy(line, cmd);
+              pos = strlen(line);
+              write(1, line, pos);
+            }
+            break;
+          }
+        }
+
+      } else if (c == 127) { // Backspace
+        if (pos > 0) {
+          pos--;
+          write(1, "\b \b", 3);
+        }
+      } else {
+        line[pos++] = c;
+        write(1, &c, 1);
+      }
     }
 
-    if (line_len > 0 && line[line_len - 1] == '\n') {
-      line[line_len - 1] = '\0';
+    if (c == 4) {
+      shell->running = false;
+      break;
+    }
+
+    line[pos] = '\0';
+    write(1, "\n", 1);
+    shell->history_viewer.active = false;
+
+    if (pos > 0 && line[pos - 1] == '\n') {
+      line[pos - 1] = '\0';
     }
 
     if (line[0] == '\0') {
@@ -193,6 +285,7 @@ void shell_run(struct shell *shell) {
       continue;
     }
 
+    set_canonical_mode();
     struct ast_node *ast = parse(token_lst, 0, token_lst->count);
     ast_exec(shell, ast);
     ast_free(ast);
@@ -203,5 +296,5 @@ void shell_run(struct shell *shell) {
     free(token_lst->tokens);
     free(token_lst);
   }
-  free(line);
+  // free(line);
 }
