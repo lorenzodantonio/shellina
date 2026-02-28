@@ -29,20 +29,16 @@ void shell_free(struct shell *shell) {
   free(shell);
 }
 
-void set_raw_mode(void);
-void set_canonical_mode(void);
+void set_canonical_mode(void) { tcsetattr(STDIN_FILENO, TCSAFLUSH, &term); }
 
 void set_raw_mode(void) {
   tcgetattr(STDIN_FILENO, &term);
-  atexit(set_canonical_mode); // reset at exit
 
   struct termios raw = term;
   raw.c_lflag &=
       ~(ECHO | ICANON | ISIG); // No echo, no line buffer, no signals (Ctrl+C)
   tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
-
-void set_canonical_mode(void) { tcsetattr(STDIN_FILENO, TCSAFLUSH, &term); }
 
 void shell_history_restore(struct shell *shell) {
   FILE *f = fopen(".history.log", "r");
@@ -184,11 +180,16 @@ void ast_exec(struct shell *shell, struct ast_node *ast) {
   }
 }
 
+void shell_display_prompt(void) {
+  printf("%s> ", getcwd(NULL, 0));
+  fflush(stdout);
+}
+
 void shell_run(struct shell *shell) {
   char line[4096];
+  atexit(set_canonical_mode); // reset at exit
   while (shell->running) {
-    printf("%s> ", getcwd(NULL, 0));
-    fflush(stdout);
+    shell_display_prompt();
 
     size_t pos = 0;
     char c;
@@ -210,9 +211,7 @@ void shell_run(struct shell *shell) {
                 shell->history_viewer.cursor = shell->history->count;
               }
               write(1, "\r\x1b[K", 4); // clear
-
-              printf("%s> ", getcwd(NULL, 0));
-              fflush(stdout);
+              shell_display_prompt();
 
               char *cmd =
                   shell->history->commands[shell->history_viewer.cursor - 1];
@@ -233,9 +232,7 @@ void shell_run(struct shell *shell) {
               }
 
               write(1, "\r\x1b[K", 4); // clear
-
-              printf("%s> ", getcwd(NULL, 0));
-              fflush(stdout);
+              shell_display_prompt();
 
               char *cmd =
                   shell->history->commands[shell->history_viewer.cursor - 1];
