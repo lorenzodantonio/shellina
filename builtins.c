@@ -47,6 +47,9 @@ int export(struct shell *shell, int argc, char **argv) {
   }
   if (argc == 2) {
     char *eq = strchr(argv[1], '=');
+    if (!eq) {
+      return 0;
+    }
     *eq = '\0';
     param_registry_set(shell->param_registry, argv[1], eq + 1);
 
