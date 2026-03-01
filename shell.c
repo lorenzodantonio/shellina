@@ -19,7 +19,6 @@ struct shell *shell_new(void) {
   s->raw_mode = false;
   s->param_registry = param_registry_new(1024);
   s->history = history_new(1024);
-  s->history_viewer.active = false;
   s->running = true;
   return s;
 }
@@ -199,45 +198,12 @@ void shell_clear(void) {
   write(1, "\r\x1b[K", 4);
 }
 
-size_t shell_history_next(struct shell *shell, char *line) {
-  if (shell->history->count <= 0) {
-    line[0] = '\0';
+ssize_t clear_line(char *line, char *cmd) {
+  if (!cmd) {
     return 0;
   }
-
-  if (shell->history_viewer.active && shell->history_viewer.cursor > 1) {
-    shell->history_viewer.cursor--;
-  } else {
-    shell->history_viewer.active = true;
-    shell->history_viewer.cursor = shell->history->count;
-  }
-
-  shell_clear();
-  display_prompt();
-
-  char *cmd = shell->history->commands[shell->history_viewer.cursor - 1];
-  strcpy(line, cmd);
-  size_t len = strlen(line);
-  write(1, line, len);
-  return len;
-}
-
-size_t shell_history_prev(struct shell *shell, char *line) {
-  if (shell->history->count <= 0 || !shell->history_viewer.active) {
-    line[0] = '\0';
-    return 0;
-  }
-  if (shell->history_viewer.cursor < shell->history->count) {
-    shell->history_viewer.cursor++;
-  } else {
-    shell->history_viewer.cursor = 1;
-  }
-
   write(1, "\r\x1b[K", 4); // clear
   display_prompt();
-
-  char *cmd = shell->history->commands[shell->history_viewer.cursor - 1];
-
   strcpy(line, cmd);
   size_t len = strlen(line);
   write(1, line, len);
@@ -261,12 +227,16 @@ void shell_run(struct shell *shell) {
         char seq[2];
         if ((read(0, &seq[0], 1) == 1) && (read(0, &seq[1], 1) == 1)) {
           switch (seq[1]) {
-          case 'A':
-            pos = shell_history_next(shell, &line[0]);
+          case 'A': {
+            char *cmd = history_next(shell->history);
+            pos = clear_line(line, cmd);
             break;
-          case 'B':
-            pos = shell_history_prev(shell, &line[0]);
+          }
+          case 'B': {
+            char *cmd = history_prev(shell->history);
+            pos = clear_line(line, cmd);
             break;
+          }
           }
         }
       } else if (c == 127 || c == 8) { // Backspace
@@ -287,7 +257,7 @@ void shell_run(struct shell *shell) {
 
     line[pos] = '\0';
     write(1, "\n", 1);
-    shell->history_viewer.active = false;
+    shell->history->active = false;
 
     if (pos > 0 && line[pos - 1] == '\n') {
       line[pos - 1] = '\0';
