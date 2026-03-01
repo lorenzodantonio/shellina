@@ -19,6 +19,7 @@ struct shell *shell_new(void) {
   s->raw_mode = false;
   s->param_registry = param_registry_new(1024);
   s->history = history_new(1024);
+  s->history_viewer.active = false;
   s->running = true;
   return s;
 }
@@ -180,16 +181,67 @@ void ast_exec(struct shell *shell, struct ast_node *ast) {
   }
 }
 
-void shell_display_prompt(void) {
+void display_prompt(void) {
   printf("%s> ", getcwd(NULL, 0));
   fflush(stdout);
+}
+
+void shell_clear(void) {
+  // clears screen
+  write(1, "\r\x1b[K", 4);
+}
+
+size_t shell_history_next(struct shell *shell, char *line) {
+  if (shell->history->count <= 0) {
+    line[0] = '\0';
+    return 0;
+  }
+
+  if (shell->history_viewer.active && shell->history_viewer.cursor > 1) {
+    shell->history_viewer.cursor--;
+  } else {
+    shell->history_viewer.active = true;
+    shell->history_viewer.cursor = shell->history->count;
+  }
+
+  shell_clear();
+  display_prompt();
+
+  char *cmd = shell->history->commands[shell->history_viewer.cursor - 1];
+  strcpy(line, cmd);
+  size_t len = strlen(line);
+  write(1, line, len);
+  return len;
+}
+
+size_t shell_history_prev(struct shell *shell, char *line) {
+  if (shell->history->count <= 0 || !shell->history_viewer.active) {
+    line[0] = '\0';
+    return 0;
+  }
+  if (shell->history_viewer.cursor < shell->history->count) {
+    shell->history_viewer.cursor++;
+  } else {
+    shell->history_viewer.cursor = 1;
+  }
+
+  write(1, "\r\x1b[K", 4); // clear
+  display_prompt();
+
+  char *cmd = shell->history->commands[shell->history_viewer.cursor - 1];
+
+  strcpy(line, cmd);
+  size_t len = strlen(line);
+  write(1, line, len);
+  return len;
 }
 
 void shell_run(struct shell *shell) {
   char line[4096];
   atexit(set_canonical_mode); // reset at exit
+
   while (shell->running) {
-    shell_display_prompt();
+    display_prompt();
 
     size_t pos = 0;
     char c;
@@ -202,50 +254,14 @@ void shell_run(struct shell *shell) {
         if ((read(0, &seq[0], 1) == 1) && (read(0, &seq[1], 1) == 1)) {
           switch (seq[1]) {
           case 'A':
-            if (shell->history->count > 0) {
-              if (shell->history_viewer.active &&
-                  shell->history_viewer.cursor > 1) {
-                shell->history_viewer.cursor--;
-              } else {
-                shell->history_viewer.active = true;
-                shell->history_viewer.cursor = shell->history->count;
-              }
-              write(1, "\r\x1b[K", 4); // clear
-              shell_display_prompt();
-
-              char *cmd =
-                  shell->history->commands[shell->history_viewer.cursor - 1];
-
-              strcpy(line, cmd);
-              pos = strlen(line);
-              write(1, line, pos);
-            }
+            pos = shell_history_next(shell, &line[0]);
             break;
           case 'B':
-            if (shell->history->count > 0) {
-              if (shell->history_viewer.active) {
-                if (shell->history_viewer.cursor < shell->history->count) {
-                  shell->history_viewer.cursor++;
-                } else {
-                  shell->history_viewer.cursor = 1;
-                }
-              }
-
-              write(1, "\r\x1b[K", 4); // clear
-              shell_display_prompt();
-
-              char *cmd =
-                  shell->history->commands[shell->history_viewer.cursor - 1];
-
-              strcpy(line, cmd);
-              pos = strlen(line);
-              write(1, line, pos);
-            }
+            pos = shell_history_prev(shell, &line[0]);
             break;
           }
         }
-
-      } else if (c == 127) { // Backspace
+      } else if (c == 127 || c == 8) { // Backspace
         if (pos > 0) {
           pos--;
           write(1, "\b \b", 3);
@@ -270,12 +286,11 @@ void shell_run(struct shell *shell) {
     }
 
     if (line[0] == '\0') {
-      // free(line);
       continue;
     }
 
     shell_history_append(shell, line);
-
+    fprintf(stdout, "look here: %s\n", line);
     struct token_list *token_lst = tokenize(line, shell->param_registry);
 
     if (token_lst->count == 0) {
