@@ -53,6 +53,10 @@ struct token *lexer_next(struct lexer *l, struct param_registry *params) {
     l->cursor++;
     return token_new(TOKEN_PIPE, "|");
   }
+  if (*l->cursor == '&' && *(l->cursor + 1) == '&') {
+    l->cursor += 2;
+    return token_new(TOKEN_AND, "&&");
+  }
 
   char tstr[4096];
   size_t tlen = 0;
@@ -149,6 +153,11 @@ void ast_free(struct ast_node *node) {
     ast_free(node->data.child.right);
     free(node);
     break;
+  case AST_NODE_AND:
+    ast_free(node->data.child.left);
+    ast_free(node->data.child.right);
+    free(node);
+    break;
   case AST_NODE_ASSIGNMENT:
     free(node->data.assignment.label);
     free(node->data.assignment.value);
@@ -183,8 +192,15 @@ struct ast_node *parse_assignment(struct token_list *lst, size_t start) {
 
 struct ast_node *parse(struct token_list *lst, size_t start, size_t end) {
   for (size_t i = start; i < end; i++) {
+
     if (lst->tokens[i]->type == TOKEN_PIPE) {
       struct ast_node *n = ast_node_new(AST_NODE_PIPE);
+      n->data.child.left = parse_command(lst, start, i);
+      n->data.child.right = parse(lst, i + 1, end);
+      return n;
+    }
+    if (lst->tokens[i]->type == TOKEN_AND) {
+      struct ast_node *n = ast_node_new(AST_NODE_AND);
       n->data.child.left = parse_command(lst, start, i);
       n->data.child.right = parse(lst, i + 1, end);
       return n;
