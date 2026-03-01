@@ -105,7 +105,7 @@ void handle_execpv(pid_t pid, char **argv) {
   }
 }
 
-void run_cmd(struct shell *shell, struct ast_node *cmd) {
+int run_cmd(struct shell *shell, struct ast_node *cmd) {
   builtin_func builtin = builtins_get(cmd->data.args[0]);
 
   if (builtin != NULL) {
@@ -114,10 +114,11 @@ void run_cmd(struct shell *shell, struct ast_node *cmd) {
       argc++;
     }
 
-    if (builtin(shell, argc, cmd->data.args) != 0) {
+    int result = builtin(shell, argc, cmd->data.args);
+    if (result != 0) {
       perror(cmd->data.args[0]);
     }
-    return;
+    return result;
   }
 
   pid_t pid = fork();
@@ -132,15 +133,16 @@ void run_cmd(struct shell *shell, struct ast_node *cmd) {
   } else {
     wait(NULL);
   }
+  return 0;
 }
 
-void ast_exec(struct shell *shell, struct ast_node *p);
+int ast_exec(struct shell *shell, struct ast_node *p);
 
-void run_pipe(struct shell *shell, struct ast_node *p) {
+int run_pipe(struct shell *shell, struct ast_node *p) {
   int fd[2];
   if (pipe(fd) == -1) {
     perror("pipe");
-    return;
+    return -1;
   }
 
   pid_t p1 = fork();
@@ -148,8 +150,7 @@ void run_pipe(struct shell *shell, struct ast_node *p) {
     dup2(fd[1], STDOUT_FILENO);
     close(fd[0]);
     close(fd[1]);
-    ast_exec(shell, p->data.child.left);
-    exit(0);
+    exit(ast_exec(shell, p->data.child.left));
   }
 
   pid_t p2 = fork();
@@ -157,28 +158,35 @@ void run_pipe(struct shell *shell, struct ast_node *p) {
     dup2(fd[0], STDIN_FILENO);
     close(fd[0]);
     close(fd[1]);
-    ast_exec(shell, p->data.child.right);
-    exit(0);
+    exit(ast_exec(shell, p->data.child.right));
   }
   close(fd[0]);
   close(fd[1]);
-  wait(NULL);
-  wait(NULL);
+
+  int status;
+  waitpid(p1, NULL, 0);
+  waitpid(p2, &status, 0);
+
+  return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
 }
 
-void ast_exec(struct shell *shell, struct ast_node *ast) {
+int ast_exec(struct shell *shell, struct ast_node *ast) {
   switch (ast->type) {
   case AST_NODE_CMD:
-    run_cmd(shell, ast);
+    return run_cmd(shell, ast);
+  case AST_NODE_AND:
+    if (ast_exec(shell, ast->data.child.left) == 0) {
+      return ast_exec(shell, ast->data.child.right);
+    }
     break;
   case AST_NODE_PIPE:
-    run_pipe(shell, ast);
-    break;
+    return run_pipe(shell, ast);
   case AST_NODE_ASSIGNMENT:
     param_registry_set(shell->param_registry, ast->data.assignment.label,
                        ast->data.assignment.value);
-    break;
+    return 0;
   }
+  return -1;
 }
 
 void display_prompt(void) {
@@ -290,7 +298,6 @@ void shell_run(struct shell *shell) {
     }
 
     shell_history_append(shell, line);
-    fprintf(stdout, "look here: %s\n", line);
     struct token_list *token_lst = tokenize(line, shell->param_registry);
 
     if (token_lst->count == 0) {

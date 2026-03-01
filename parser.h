@@ -12,6 +12,7 @@ enum lexer_state {
 enum token_type {
   TOKEN_WORD,
   TOKEN_PIPE,
+  TOKEN_AND,
 };
 
 struct token {
@@ -42,6 +43,7 @@ enum ast_node_type {
   AST_NODE_CMD,
   AST_NODE_PIPE,
   AST_NODE_ASSIGNMENT,
+  AST_NODE_AND,
 };
 
 struct parser {
