@@ -225,20 +225,16 @@ void shell_run(struct shell *shell) {
     while (read(0, &c, 1) == 1 && c != '\n' && c != 4) {
       if (c == '\x1b') {
         char seq[2];
-        if ((read(0, &seq[0], 1) == 1) && (read(0, &seq[1], 1) == 1)) {
-          switch (seq[1]) {
-          case 'A': {
-            char *cmd = history_next(shell->history);
-            pos = clear_line(line, cmd);
-            break;
-          }
-          case 'B': {
-            char *cmd = history_prev(shell->history);
-            pos = clear_line(line, cmd);
-            break;
-          }
-          }
+        bool is_arrow = (read(0, &seq[0], 1) == 1) &&
+                        (read(0, &seq[1], 1) == 1) &&
+                        (seq[1] == 'A' || seq[1] == 'B');
+        if (!is_arrow) {
+          continue;
         }
+        char *(*history_fn_ptr)(struct history *);
+        history_fn_ptr = (seq[1] == 'A') ? history_next : history_prev;
+        char *cmd = history_fn_ptr(shell->history);
+        pos = clear_line(line, cmd);
       } else if (c == 127 || c == 8) { // Backspace
         if (pos > 0) {
           pos--;
