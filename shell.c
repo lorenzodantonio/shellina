@@ -1,6 +1,7 @@
 #include "shell.h"
 #include "builtins.h"
 
+#include "eval.h"
 #include "parser.h"
 #include <ctype.h>
 #include <stdbool.h>
@@ -91,123 +92,9 @@ void shell_history_append(struct shell *shell, char *cmd) {
   fclose(f);
 }
 
-void handle_execpv(pid_t pid, char **argv) {
-  if (pid < 0) {
-    exit(EXIT_FAILURE);
-  } else if (pid == 0) {
-    execvp(argv[0], argv); // on success; does not return to the caller
-    // so if here; an error occurred
-    perror(argv[0]);
-    _exit(EXIT_FAILURE);
-  } else {
-    wait(NULL);
-  }
-}
-
-int run_cmd(struct shell *shell, struct ast_node *cmd) {
-  builtin_func builtin = builtins_get(cmd->data.args[0]);
-
-  if (builtin != NULL) {
-    size_t argc = 0;
-    while (cmd->data.args[argc] != NULL) {
-      argc++;
-    }
-
-    int result = builtin(shell, argc, cmd->data.args);
-    if (result != 0) {
-      perror(cmd->data.args[0]);
-    }
-    return result;
-  }
-
-  pid_t pid = fork();
-  char **args = cmd->data.args;
-  if (pid < 0) {
-    exit(EXIT_FAILURE);
-  } else if (pid == 0) {
-    execvp(args[0], args); // on success; does not return to the caller
-    // so if here; an error occurred
-    perror(args[0]);
-    _exit(EXIT_FAILURE);
-  } else {
-    wait(NULL);
-  }
-  return 0;
-}
-
-int ast_exec(struct shell *shell, struct ast_node *p);
-
-int run_pipe(struct shell *shell, struct ast_node *p) {
-  int fd[2];
-  if (pipe(fd) == -1) {
-    perror("pipe");
-    return -1;
-  }
-
-  pid_t p1 = fork();
-  if (p1 == 0) {
-    dup2(fd[1], STDOUT_FILENO);
-    close(fd[0]);
-    close(fd[1]);
-    exit(ast_exec(shell, p->data.child.left));
-  }
-
-  pid_t p2 = fork();
-  if (p2 == 0) {
-    dup2(fd[0], STDIN_FILENO);
-    close(fd[0]);
-    close(fd[1]);
-    exit(ast_exec(shell, p->data.child.right));
-  }
-  close(fd[0]);
-  close(fd[1]);
-
-  int status;
-  waitpid(p1, NULL, 0);
-  waitpid(p2, &status, 0);
-
-  return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-}
-
-int ast_exec(struct shell *shell, struct ast_node *ast) {
-  switch (ast->type) {
-  case AST_NODE_CMD:
-    return run_cmd(shell, ast);
-  case AST_NODE_AND:
-    if (ast_exec(shell, ast->data.child.left) == 0) {
-      return ast_exec(shell, ast->data.child.right);
-    }
-    break;
-  case AST_NODE_PIPE:
-    return run_pipe(shell, ast);
-  case AST_NODE_ASSIGNMENT:
-    param_registry_set(shell->param_registry, ast->data.assignment.label,
-                       ast->data.assignment.value);
-    return 0;
-  }
-  return -1;
-}
-
 void display_prompt(void) {
   printf("%s> ", getcwd(NULL, 0));
   fflush(stdout);
-}
-
-void shell_clear(void) {
-  // clears screen
-  write(1, "\r\x1b[K", 4);
-}
-
-ssize_t clear_line(char *line, char *cmd) {
-  if (!cmd) {
-    return 0;
-  }
-  write(1, "\r\x1b[K", 4); // clear
-  display_prompt();
-  strcpy(line, cmd);
-  size_t len = strlen(line);
-  write(1, line, len);
-  return len;
 }
 
 void shell_run(struct shell *shell) {
@@ -234,7 +121,11 @@ void shell_run(struct shell *shell) {
         char *(*history_fn_ptr)(struct history *);
         history_fn_ptr = (seq[1] == 'A') ? history_next : history_prev;
         char *cmd = history_fn_ptr(shell->history);
-        pos = clear_line(line, cmd);
+        write(1, "\r\x1b[K", 4);
+        display_prompt();
+        strcpy(line, cmd);
+        pos = strlen(line);
+        write(1, line, pos);
       } else if (c == 127 || c == 8) { // Backspace
         if (pos > 0) {
           pos--;
@@ -272,7 +163,7 @@ void shell_run(struct shell *shell) {
 
     set_canonical_mode();
     struct ast_node *ast = parse(token_lst, 0, token_lst->count);
-    ast_exec(shell, ast);
+    eval(shell, ast);
     ast_free(ast);
 
     for (size_t k = 0; k < token_lst->count; k++) {

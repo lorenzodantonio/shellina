@@ -192,7 +192,6 @@ struct ast_node *parse_assignment(struct token_list *lst, size_t start) {
 
 struct ast_node *parse(struct token_list *lst, size_t start, size_t end) {
   for (size_t i = start; i < end; i++) {
-
     if (lst->tokens[i]->type == TOKEN_PIPE) {
       struct ast_node *n = ast_node_new(AST_NODE_PIPE);
       n->data.child.left = parse_command(lst, start, i);
