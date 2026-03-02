@@ -7,10 +7,6 @@
 
 struct shell {
   struct history *history;
-  struct {
-    size_t cursor;
-    bool active;
-  } history_viewer;
   struct param_registry *param_registry;
   bool raw_mode;
   bool running;
