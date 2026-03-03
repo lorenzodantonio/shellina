@@ -78,6 +78,10 @@ void shell_history_restore(struct shell *shell) {
   fclose(f);
 }
 
+void clear_line(void) { write(1, "\r\x1b[K", 4); }
+void clear_char(void) { write(1, "\b \b", 3); }
+void shift_cursor_left(void) { write(1, "\x1b[D", 3); }
+
 void shell_history_append(struct shell *shell, struct string *cmd) {
   history_push(shell->history, cmd);
   FILE *f = fopen(".history.log", "a");
@@ -101,9 +105,9 @@ void shell_run(struct shell *shell) {
 
   while (shell->running) {
     display_prompt();
+    size_t len = 0;
     size_t pos = 0;
     char c;
-    (void)shell;
 
     set_raw_mode();
     while (read(0, &c, 1) == 1 && c != '\n' && c != 4) {
@@ -129,24 +133,60 @@ void shell_run(struct shell *shell) {
             strcpy(buffer, cmd->value);
             write(1, buffer, cmd->len);
             pos = cmd->len;
+            len = cmd->len;
             break;
           }
           case 'C':
+            if (pos < len) {
+              pos++;
+              write(1, seq, i + 1);
+            }
+            break;
+
           case 'D':
-            // write(1, seq, i + 1);
+            if (pos > 0) {
+              pos--;
+              write(1, seq, i + 1);
+            }
             break;
           default:
             fprintf(stderr, "unrecognized escaped sequence\n");
           }
         }
       } else if (c == 127 || c == 8) { // Backspace
-        if (pos > 0) {
+        if (pos == 0) {
+          continue;
+        }
+        if (pos < len) {
+          memmove(&buffer[pos - 1], &buffer[pos], len - pos);
           pos--;
+          len--;
+          clear_line();
+          display_prompt();
+          write(1, buffer, len);
+          for (size_t p = pos; p++ < len; shift_cursor_left()) {
+          }
+        } else {
           write(1, "\b \b", 3);
+          pos--;
+          len--;
         }
       } else {
-        buffer[pos++] = c;
-        write(1, &c, 1);
+        if (pos < len) {
+          memmove(&buffer[pos + 1], &buffer[pos], len - pos);
+          buffer[pos] = c;
+          pos++;
+          len++;
+          clear_line();
+          display_prompt();
+          write(1, buffer, len);
+          for (size_t p = pos; p++ < len; shift_cursor_left()) {
+          }
+        } else {
+          buffer[pos++] = c;
+          len++;
+          write(1, &c, 1);
+        }
       }
     }
 
@@ -155,8 +195,9 @@ void shell_run(struct shell *shell) {
       break;
     }
 
-    buffer[pos] = '\0';
+    buffer[len] = '\0';
     write(1, "\n", 1);
+
     shell->history->active = false;
 
     if (pos > 0 && buffer[pos - 1] == '\n') {
