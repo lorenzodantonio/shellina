@@ -101,7 +101,6 @@ void shell_run(struct shell *shell) {
 
   while (shell->running) {
     display_prompt();
-
     size_t pos = 0;
     char c;
     (void)shell;
@@ -109,20 +108,37 @@ void shell_run(struct shell *shell) {
     set_raw_mode();
     while (read(0, &c, 1) == 1 && c != '\n' && c != 4) {
       if (c == '\x1b') {
-        char seq[2];
-        bool is_arrow = (read(0, &seq[0], 1) == 1) &&
-                        (read(0, &seq[1], 1) == 1) &&
-                        (seq[1] == 'A' || seq[1] == 'B');
-        if (!is_arrow) {
-          continue;
+        char seq[8];
+        size_t i = 0;
+        seq[i++] = c;
+        if (read(0, &seq[i], 1) == 1 && seq[i] == '[') {
+          i++;
+          while ((read(0, &seq[i], 1) == 1) &&
+                 (!isalnum(seq[i]) && seq[i] != '~')) {
+            // TODO handle overflow
+            i++;
+          }
+          switch (seq[i]) {
+          case 'A':
+          case 'B': {
+            struct string *(*history_fn_ptr)(struct history *);
+            history_fn_ptr = (seq[i] == 'A') ? history_next : history_prev;
+            struct string *cmd = history_fn_ptr(shell->history);
+            write(1, "\r\x1b[K", 4);
+            display_prompt();
+            strcpy(buffer, cmd->value);
+            write(1, buffer, cmd->len);
+            pos = cmd->len;
+            break;
+          }
+          case 'C':
+          case 'D':
+            // write(1, seq, i + 1);
+            break;
+          default:
+            fprintf(stderr, "unrecognized escaped sequence\n");
+          }
         }
-        struct string *(*history_fn_ptr)(struct history *);
-        history_fn_ptr = (seq[1] == 'A') ? history_next : history_prev;
-        struct string *cmd = history_fn_ptr(shell->history);
-        write(1, "\r\x1b[K", 4);
-        display_prompt();
-        strcpy(buffer, cmd->value);
-        write(1, buffer, cmd->len);
       } else if (c == 127 || c == 8) { // Backspace
         if (pos > 0) {
           pos--;
