@@ -8,3 +8,4 @@ struct string {
 };
 
 struct string *string_new(char *s);
+struct string *string_clone(struct string *other);

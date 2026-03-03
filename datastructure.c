@@ -9,3 +9,10 @@ struct string *string_new(char *s) {
   str->len = len;
   return str;
 }
+
+struct string *string_clone(struct string *other) {
+  size_t len = other->len;
+  struct string *s = malloc(sizeof(*s) + len + 1);
+  memcpy(s, other, sizeof(*s) + len + 1);
+  return s;
+}
