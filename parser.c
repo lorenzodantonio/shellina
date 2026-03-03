@@ -7,7 +7,7 @@
 
 struct token *token_new(enum token_type type, char *str) {
   struct token *t = malloc(sizeof(*t));
-  t->str = strdup(str);
+  t->str = string_new(str);
   t->type = type;
   return t;
 }
@@ -84,7 +84,8 @@ struct token *lexer_next(struct lexer *l, struct param_registry *params) {
 
       struct param *param = param_registry_find(params, param_name);
       if (param) {
-        tlen += snprintf(tstr + tlen, sizeof(tstr) - tlen, "%s", param->value);
+        tlen += snprintf(tstr + tlen, sizeof(tstr) - tlen, "%s",
+                         param->value->value);
       } else {
         fprintf(stderr, "parameter expansion error\n");
       }
@@ -172,7 +173,9 @@ struct ast_node *parse_command(struct token_list *lst, size_t start,
   size_t argc = end - start;
   n->data.args = malloc(sizeof(char *) * (argc + 1));
   for (size_t i = 0; i < argc; i++) {
-    n->data.args[i] = strdup(lst->tokens[start + i]->str);
+    size_t len = lst->tokens[start + i]->str->len;
+    n->data.args[i] = malloc(len + 1);
+    memcpy(n->data.args[i], lst->tokens[start + i]->str->value, len + 1);
   }
   n->data.args[argc] = NULL;
   return n;
@@ -180,12 +183,13 @@ struct ast_node *parse_command(struct token_list *lst, size_t start,
 
 struct ast_node *parse_assignment(struct token_list *lst, size_t start) {
   struct ast_node *n = ast_node_new(AST_NODE_ASSIGNMENT);
-  char *str = lst->tokens[start]->str;
-  char *eq = strchr(str, '=');
+
+  struct string *str = lst->tokens[start]->str;
+  char *eq = strchr(str->value, '=');
   *eq = '\0';
 
-  n->data.assignment.label = strdup(str);
-  n->data.assignment.value = strdup(eq + 1);
+  n->data.assignment.label = string_new(str->value);
+  n->data.assignment.value = string_new(eq + 1);
 
   return n;
 }
@@ -194,19 +198,20 @@ struct ast_node *parse(struct token_list *lst, size_t start, size_t end) {
   for (size_t i = start; i < end; i++) {
     if (lst->tokens[i]->type == TOKEN_PIPE) {
       struct ast_node *n = ast_node_new(AST_NODE_PIPE);
-      n->data.child.left = parse_command(lst, start, i);
+      n->data.child.left = parse(lst, start, i);
       n->data.child.right = parse(lst, i + 1, end);
       return n;
     }
     if (lst->tokens[i]->type == TOKEN_AND) {
       struct ast_node *n = ast_node_new(AST_NODE_AND);
-      n->data.child.left = parse_command(lst, start, i);
+      n->data.child.left = parse(lst, start, i);
       n->data.child.right = parse(lst, i + 1, end);
       return n;
     }
   }
 
-  if ((end - start) == 1 && strchr(lst->tokens[start]->str, '=') != NULL) {
+  if ((end - start) == 1 &&
+      strchr(lst->tokens[start]->str->value, '=') != NULL) {
     return parse_assignment(lst, start);
   }
 

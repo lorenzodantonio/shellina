@@ -62,19 +62,17 @@ void shell_history_restore(struct shell *shell) {
     }
   }
 
-  char *line = NULL;
-  size_t size;
-
-  ssize_t nread;
-  while ((nread = getline(&line, &size, f)) != -1) {
-    if (nread > 0) {
-      line[nread - 1] = '\0';
-      history_push(shell->history, line);
+  char line[4096];
+  while (fgets(line, sizeof(line), f)) {
+    size_t nread = strlen(line);
+    if (nread <= 0) {
+      return;
     }
-    free(line);
-    line = NULL;
-    size = 0;
-    nread = 0;
+    if (line[nread - 1] == '\n') {
+      line[nread - 1] = '\0';
+      nread--;
+    }
+    history_push(shell->history, line);
   }
 
   fclose(f);
@@ -118,12 +116,12 @@ void shell_run(struct shell *shell) {
         if (!is_arrow) {
           continue;
         }
-        char *(*history_fn_ptr)(struct history *);
+        struct string *(*history_fn_ptr)(struct history *);
         history_fn_ptr = (seq[1] == 'A') ? history_next : history_prev;
-        char *cmd = history_fn_ptr(shell->history);
+        struct string *cmd = history_fn_ptr(shell->history);
         write(1, "\r\x1b[K", 4);
         display_prompt();
-        strcpy(line, cmd);
+        strcpy(line, cmd->value);
         pos = strlen(line);
         write(1, line, pos);
       } else if (c == 127 || c == 8) { // Backspace

@@ -5,9 +5,10 @@
 struct history *history_new(size_t capacity) {
   struct history *h = malloc(sizeof(*h));
   h->capacity = capacity;
+  h->cursor = 0;
   h->count = 0;
   h->head = 0;
-  h->commands = calloc(capacity, sizeof(char *));
+  h->commands = calloc(capacity, sizeof(struct string *));
   h->active = true;
   return h;
 }
@@ -16,7 +17,7 @@ void history_push(struct history *h, char *cmd) {
   if (h->commands[h->head]) {
     free(h->commands[h->head]);
   }
-  h->commands[h->head] = strdup(cmd);
+  h->commands[h->head] = string_new(cmd);
 
   if (h->count < h->capacity) {
     h->count++;
@@ -32,7 +33,7 @@ void history_free(struct history *h) {
   free(h);
 }
 
-char *history_next(struct history *history) {
+struct string *history_next(struct history *history) {
   if (history->count <= 0) {
     return NULL;
   }
@@ -47,7 +48,7 @@ char *history_next(struct history *history) {
   return history->commands[history->cursor - 1];
 }
 
-char *history_prev(struct history *history) {
+struct string *history_prev(struct history *history) {
   if (history->count <= 0 || !history->active) {
     return NULL;
   }

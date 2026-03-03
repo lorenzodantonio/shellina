@@ -1,5 +1,6 @@
 #pragma once
 
+#include "datastructure.h"
 #include <stdlib.h>
 
 struct param_registry;
@@ -16,7 +17,7 @@ enum token_type {
 };
 
 struct token {
-  char *str;
+  struct string *str;
   enum token_type type;
 };
 
@@ -56,8 +57,8 @@ struct ast_node {
   union {
     char **args;
     struct {
-      char *label;
-      char *value;
+      struct string *label;
+      struct string *value;
     } assignment;
     struct {
       struct ast_node *left;

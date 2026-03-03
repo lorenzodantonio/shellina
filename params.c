@@ -15,7 +15,7 @@ struct param_registry *param_registry_new(size_t initial_capacity) {
 struct param *param_registry_find(struct param_registry *registry,
                                   char *label) {
   for (size_t i = 0; i < registry->count; i++) {
-    if (strcmp(registry->vars[i].label, label) == 0) {
+    if (strcmp(registry->vars[i].label->value, label) == 0) {
       return &registry->vars[i];
     }
   }
@@ -34,7 +34,7 @@ void param_registry_free(struct param_registry *registry) {
 void param_registry_set(struct param_registry *registry, char *label,
                         char *value) {
   struct param *param = param_registry_find(registry, label);
-  char *valcpy = strdup(value);
+  struct string *valcpy = string_new(value);
   if (param) {
     free(param->value);
     param->value = valcpy;
@@ -48,6 +48,6 @@ void param_registry_set(struct param_registry *registry, char *label,
   }
 
   registry->vars[registry->count].value = valcpy;
-  registry->vars[registry->count].label = strdup(label);
+  registry->vars[registry->count].label = string_new(label);
   registry->count++;
 }

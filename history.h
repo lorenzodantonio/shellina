@@ -1,9 +1,10 @@
 #pragma once
+#include "datastructure.h"
 #include <stdbool.h>
 #include <stdlib.h>
 
 struct history {
-  char **commands;
+  struct string **commands;
   size_t head;
   size_t capacity;
   size_t count;
@@ -15,5 +16,5 @@ struct history *history_new(size_t capacity);
 void history_push(struct history *history, char *command);
 void history_free(struct history *history);
 
-char *history_next(struct history *history);
-char *history_prev(struct history *history);
+struct string *history_next(struct history *history);
+struct string *history_prev(struct history *history);

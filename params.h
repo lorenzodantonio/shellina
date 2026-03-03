@@ -1,11 +1,12 @@
 #pragma once
 
+#include "datastructure.h"
 #include <stdbool.h>
 #include <stdlib.h>
 
 struct param {
-  char *label;
-  char *value;
+  struct string *label;
+  struct string *value;
   bool exported;
 };
 

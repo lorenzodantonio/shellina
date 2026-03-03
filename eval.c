@@ -1,22 +1,27 @@
 #include "eval.h"
 #include "builtins.h"
 #include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 int eval(struct shell *shell, struct ast_node *ast) {
   switch (ast->type) {
   case AST_NODE_CMD:
     return eval_command(shell, ast);
-  case AST_NODE_AND:
-    if (eval(shell, ast->data.child.left) == 0) {
+  case AST_NODE_AND: {
+    int res = eval(shell, ast->data.child.left);
+    if (res == 0) {
       return eval(shell, ast->data.child.right);
     }
-    break;
+    return res;
+  }
   case AST_NODE_PIPE:
     return eval_pipe(shell, ast);
   case AST_NODE_ASSIGNMENT:
-    param_registry_set(shell->param_registry, ast->data.assignment.label,
-                       ast->data.assignment.value);
+    param_registry_set(shell->param_registry, ast->data.assignment.label->value,
+                       ast->data.assignment.value->value);
     return 0;
   }
   return -1;

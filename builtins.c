@@ -40,8 +40,8 @@ int cd(struct shell *shell, int argc, char **argv) {
 int export(struct shell *shell, int argc, char **argv) {
   if (argc == 1) {
     for (size_t i = 0; i < shell->param_registry->count; i++) {
-      printf("%s: %s\n", shell->param_registry->vars[i].label,
-             shell->param_registry->vars[i].value);
+      printf("%s: %s\n", shell->param_registry->vars[i].label->value,
+             shell->param_registry->vars[i].value->value);
     }
     return 0;
   }
@@ -59,14 +59,14 @@ int export(struct shell *shell, int argc, char **argv) {
   return -1;
 }
 
-static struct builtin builtins[];
+static struct builtin builtins[6];
 
 int set(struct shell *shell, int argc, char **argv) {
   (void)argc;
   (void)argv;
 
   for (size_t i = 0; i < shell->param_registry->count; i++) {
-    printf("%s\n", shell->param_registry->vars[i].label);
+    printf("%s\n", shell->param_registry->vars[i].label->value);
   }
 
   size_t k = 0;
@@ -77,7 +77,7 @@ int set(struct shell *shell, int argc, char **argv) {
   return 0;
 }
 
-static struct builtin builtins[] = {
+static struct builtin builtins[6] = {
     {":", noop},    {"cd", cd},   {"export", export},
     {"exit", quit}, {"set", set}, {NULL, NULL},
 };
