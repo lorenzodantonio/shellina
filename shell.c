@@ -122,8 +122,7 @@ void shell_run(struct shell *shell) {
         write(1, "\r\x1b[K", 4);
         display_prompt();
         strcpy(line, cmd->value);
-        pos = cmd->len;
-        write(1, line, pos);
+        write(1, line, cmd->len);
       } else if (c == 127 || c == 8) { // Backspace
         if (pos > 0) {
           pos--;
