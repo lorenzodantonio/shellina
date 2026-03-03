@@ -51,7 +51,8 @@ int export(struct shell *shell, int argc, char **argv) {
       return 0;
     }
     *eq = '\0';
-    param_registry_set(shell->param_registry, argv[1], eq + 1);
+    param_registry_set(shell->param_registry, string_new(argv[1]),
+                       string_new(eq + 1));
 
     return 0;
   }

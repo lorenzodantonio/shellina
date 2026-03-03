@@ -13,11 +13,11 @@ struct history *history_new(size_t capacity) {
   return h;
 }
 
-void history_push(struct history *h, char *cmd) {
+void history_push(struct history *h, struct string *cmd) {
   if (h->commands[h->head]) {
     free(h->commands[h->head]);
   }
-  h->commands[h->head] = string_new(cmd);
+  h->commands[h->head] = cmd;
 
   if (h->count < h->capacity) {
     h->count++;

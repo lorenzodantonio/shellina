@@ -38,7 +38,7 @@ struct token_list {
 struct lexer *lexer_new(char *line);
 void lexer_free(struct lexer *p);
 
-struct token_list *tokenize(char *line, struct param_registry *params);
+struct token_list *tokenize(struct string *line, struct param_registry *params);
 
 enum ast_node_type {
   AST_NODE_CMD,

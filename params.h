@@ -18,7 +18,8 @@ struct param_registry {
 
 struct param_registry *param_registry_new(size_t initial_capacity);
 void param_registry_free(struct param_registry *params);
-void param_registry_set(struct param_registry *params, char *label,
-                        char *value);
+void param_registry_set(struct param_registry *params, struct string *label,
+                        struct string *value);
 
-struct param *param_registry_find(struct param_registry *params, char *label);
+struct param *param_registry_find(struct param_registry *params,
+                                  struct string *label);

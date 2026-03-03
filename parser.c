@@ -82,7 +82,8 @@ struct token *lexer_next(struct lexer *l, struct param_registry *params) {
       memcpy(param_name, start, param_len);
       param_name[param_len] = '\0';
 
-      struct param *param = param_registry_find(params, param_name);
+      // TODO refactor
+      struct param *param = param_registry_find(params, string_new(param_name));
       if (param) {
         tlen += snprintf(tstr + tlen, sizeof(tstr) - tlen, "%s",
                          param->value->value);
@@ -109,8 +110,10 @@ struct token *lexer_next(struct lexer *l, struct param_registry *params) {
   return token_new(TOKEN_WORD, tstr);
 }
 
-struct token_list *tokenize(char *line, struct param_registry *params) {
-  struct lexer lexer = {.line = line, .cursor = line, .state = STATE_NORMAL};
+struct token_list *tokenize(struct string *line,
+                            struct param_registry *params) {
+  struct lexer lexer = {
+      .line = line->value, .cursor = line->value, .state = STATE_NORMAL};
 
   struct token_list *lst = malloc(sizeof(*lst));
 

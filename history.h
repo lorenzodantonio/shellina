@@ -13,7 +13,7 @@ struct history {
 };
 
 struct history *history_new(size_t capacity);
-void history_push(struct history *history, char *command);
+void history_push(struct history *history, struct string *command);
 void history_free(struct history *history);
 
 struct string *history_next(struct history *history);

@@ -72,13 +72,13 @@ void shell_history_restore(struct shell *shell) {
       line[nread - 1] = '\0';
       nread--;
     }
-    history_push(shell->history, line);
+    history_push(shell->history, string_new(line));
   }
 
   fclose(f);
 }
 
-void shell_history_append(struct shell *shell, char *cmd) {
+void shell_history_append(struct shell *shell, struct string *cmd) {
   history_push(shell->history, cmd);
   FILE *f = fopen(".history.log", "a");
   if (!f) {
@@ -86,7 +86,7 @@ void shell_history_append(struct shell *shell, char *cmd) {
     return;
   }
 
-  fprintf(f, "%s\n", cmd);
+  fprintf(f, "%s\n", cmd->value);
   fclose(f);
 }
 
@@ -96,7 +96,7 @@ void display_prompt(void) {
 }
 
 void shell_run(struct shell *shell) {
-  char line[4096];
+  char buffer[4096];
   atexit(set_canonical_mode); // reset at exit
 
   while (shell->running) {
@@ -121,15 +121,15 @@ void shell_run(struct shell *shell) {
         struct string *cmd = history_fn_ptr(shell->history);
         write(1, "\r\x1b[K", 4);
         display_prompt();
-        strcpy(line, cmd->value);
-        write(1, line, cmd->len);
+        strcpy(buffer, cmd->value);
+        write(1, buffer, cmd->len);
       } else if (c == 127 || c == 8) { // Backspace
         if (pos > 0) {
           pos--;
           write(1, "\b \b", 3);
         }
       } else {
-        line[pos++] = c;
+        buffer[pos++] = c;
         write(1, &c, 1);
       }
     }
@@ -139,17 +139,19 @@ void shell_run(struct shell *shell) {
       break;
     }
 
-    line[pos] = '\0';
+    buffer[pos] = '\0';
     write(1, "\n", 1);
     shell->history->active = false;
 
-    if (pos > 0 && line[pos - 1] == '\n') {
-      line[pos - 1] = '\0';
+    if (pos > 0 && buffer[pos - 1] == '\n') {
+      buffer[pos - 1] = '\0';
     }
 
-    if (line[0] == '\0') {
+    if (buffer[0] == '\0') {
       continue;
     }
+
+    struct string *line = string_new(buffer);
 
     shell_history_append(shell, line);
     struct token_list *token_lst = tokenize(line, shell->param_registry);

@@ -20,8 +20,8 @@ int eval(struct shell *shell, struct ast_node *ast) {
   case AST_NODE_PIPE:
     return eval_pipe(shell, ast);
   case AST_NODE_ASSIGNMENT:
-    param_registry_set(shell->param_registry, ast->data.assignment.label->value,
-                       ast->data.assignment.value->value);
+    param_registry_set(shell->param_registry, ast->data.assignment.label,
+                       ast->data.assignment.value);
     return 0;
   }
   return -1;
