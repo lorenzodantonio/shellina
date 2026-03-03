@@ -153,7 +153,10 @@ void shell_run(struct shell *shell) {
             fprintf(stderr, "unrecognized escaped sequence\n");
           }
         }
-      } else if (c == 127 || c == 8) { // Backspace
+        continue;
+      }
+
+      if (c == 127 || c == 8) { // Backspace
         if (pos == 0) {
           continue;
         }
@@ -164,30 +167,30 @@ void shell_run(struct shell *shell) {
           clear_line();
           display_prompt();
           write(1, buffer, len);
-          for (size_t p = pos; p++ < len; shift_cursor_left()) {
-          }
-        } else {
-          write(1, "\b \b", 3);
-          pos--;
-          len--;
+          for (size_t p = pos; p++ < len; shift_cursor_left())
+            ;
+          continue;
         }
-      } else {
-        if (pos < len) {
-          memmove(&buffer[pos + 1], &buffer[pos], len - pos);
-          buffer[pos] = c;
-          pos++;
-          len++;
-          clear_line();
-          display_prompt();
-          write(1, buffer, len);
-          for (size_t p = pos; p++ < len; shift_cursor_left()) {
-          }
-        } else {
-          buffer[pos++] = c;
-          len++;
-          write(1, &c, 1);
-        }
+        write(1, "\b \b", 3);
+        pos--;
+        len--;
+        continue;
       }
+      if (pos < len) {
+        memmove(&buffer[pos + 1], &buffer[pos], len - pos);
+        buffer[pos] = c;
+        pos++;
+        len++;
+        clear_line();
+        display_prompt();
+        write(1, buffer, len);
+        for (size_t p = pos; p++ < len; shift_cursor_left()) {
+        }
+        continue;
+      }
+      buffer[pos++] = c;
+      len++;
+      write(1, &c, 1);
     }
 
     if (c == 4) {
@@ -228,5 +231,4 @@ void shell_run(struct shell *shell) {
     free(token_lst->tokens);
     free(token_lst);
   }
-  // free(line);
 }
