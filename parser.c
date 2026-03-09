@@ -213,8 +213,11 @@ struct ast_node *parse(struct token_list *lst, size_t start, size_t end) {
     }
   }
 
-  if ((end - start) == 1 &&
-      strchr(lst->tokens[start]->str->value, '=') != NULL) {
+  char *eqpos = strchr(lst->tokens[start]->str->value, '=');
+
+  if (eqpos != NULL && eqpos > lst->tokens[start]->str->value &&
+      !isdigit(*lst->tokens[start]->str->value) && isalnum(*(eqpos - 1)) &&
+      isalnum(*(eqpos + 1))) {
     return parse_assignment(lst, start);
   }
 
