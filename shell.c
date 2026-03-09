@@ -3,6 +3,7 @@
 
 #include "eval.h"
 #include "parser.h"
+
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -99,6 +100,75 @@ void display_prompt(void) {
   fflush(stdout);
 }
 
+void read_escape(struct shell *shell, char *buffer, size_t *pos, size_t *len) {
+  char c = '\x1b';
+  // *pos = 0;
+  // *len = 0;
+  char seq[8];
+  size_t i = 0;
+  seq[i++] = c;
+  if (read(0, &seq[i], 1) == 1 && seq[i] == '[') {
+    i++;
+    while ((read(0, &seq[i], 1) == 1) && (!isalnum(seq[i]) && seq[i] != '~')) {
+      // TODO handle overflow
+      i++;
+    }
+    switch (seq[i]) {
+    case 'A':
+    case 'B': {
+      struct string *(*history_fn_ptr)(struct history *);
+      history_fn_ptr = (seq[i] == 'A') ? history_next : history_prev;
+      struct string *cmd = history_fn_ptr(shell->history);
+      write(1, "\r\x1b[K", 4);
+      display_prompt();
+      strcpy(buffer, cmd->value);
+      write(1, buffer, cmd->len);
+      *pos = cmd->len;
+      *len = cmd->len;
+      break;
+    }
+    case 'C':
+      if (*pos < *len) {
+        (*pos)++;
+        write(1, seq, i + 1);
+      }
+      break;
+
+    case 'D':
+      if (*pos > 0) {
+        (*pos)--;
+        write(1, seq, i + 1);
+      }
+      break;
+    default:
+      fprintf(stderr, "unrecognized escaped sequence\n");
+    }
+  }
+}
+
+void buffer_middle_delete(char *buffer, size_t *pos, size_t *len) {
+  memmove(&buffer[(*pos) - 1], &buffer[*pos], *len - *pos);
+  (*pos)--;
+  (*len)--;
+  clear_line();
+  display_prompt();
+  write(1, buffer, *len);
+  for (size_t p = *pos; p++ < *len; shift_cursor_left())
+    ;
+}
+
+void buffer_middle_insert(char *buffer, char c, size_t *pos, size_t *len) {
+  memmove(&buffer[(*pos) + 1], &buffer[*pos], *len - *pos);
+  buffer[*pos] = c;
+  (*pos)++;
+  (*len)++;
+  clear_line();
+  display_prompt();
+  write(1, buffer, *len);
+  for (size_t p = *pos; p++ < *len; shift_cursor_left())
+    ;
+}
+
 void shell_run(struct shell *shell) {
   char buffer[4096];
   atexit(set_canonical_mode); // reset at exit
@@ -112,47 +182,7 @@ void shell_run(struct shell *shell) {
     set_raw_mode();
     while (read(0, &c, 1) == 1 && c != '\n' && c != 4) {
       if (c == '\x1b') {
-        char seq[8];
-        size_t i = 0;
-        seq[i++] = c;
-        if (read(0, &seq[i], 1) == 1 && seq[i] == '[') {
-          i++;
-          while ((read(0, &seq[i], 1) == 1) &&
-                 (!isalnum(seq[i]) && seq[i] != '~')) {
-            // TODO handle overflow
-            i++;
-          }
-          switch (seq[i]) {
-          case 'A':
-          case 'B': {
-            struct string *(*history_fn_ptr)(struct history *);
-            history_fn_ptr = (seq[i] == 'A') ? history_next : history_prev;
-            struct string *cmd = history_fn_ptr(shell->history);
-            write(1, "\r\x1b[K", 4);
-            display_prompt();
-            strcpy(buffer, cmd->value);
-            write(1, buffer, cmd->len);
-            pos = cmd->len;
-            len = cmd->len;
-            break;
-          }
-          case 'C':
-            if (pos < len) {
-              pos++;
-              write(1, seq, i + 1);
-            }
-            break;
-
-          case 'D':
-            if (pos > 0) {
-              pos--;
-              write(1, seq, i + 1);
-            }
-            break;
-          default:
-            fprintf(stderr, "unrecognized escaped sequence\n");
-          }
-        }
+        read_escape(shell, &buffer[0], &pos, &len);
         continue;
       }
 
@@ -161,31 +191,18 @@ void shell_run(struct shell *shell) {
           continue;
         }
         if (pos < len) {
-          memmove(&buffer[pos - 1], &buffer[pos], len - pos);
-          pos--;
-          len--;
-          clear_line();
-          display_prompt();
-          write(1, buffer, len);
-          for (size_t p = pos; p++ < len; shift_cursor_left())
-            ;
+          buffer_middle_delete(&buffer[0], &pos, &len);
           continue;
         }
+
         write(1, "\b \b", 3);
         pos--;
         len--;
         continue;
       }
+
       if (pos < len) {
-        memmove(&buffer[pos + 1], &buffer[pos], len - pos);
-        buffer[pos] = c;
-        pos++;
-        len++;
-        clear_line();
-        display_prompt();
-        write(1, buffer, len);
-        for (size_t p = pos; p++ < len; shift_cursor_left()) {
-        }
+        buffer_middle_insert(&buffer[0], c, &pos, &len);
         continue;
       }
       buffer[pos++] = c;
