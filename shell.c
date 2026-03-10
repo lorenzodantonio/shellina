@@ -100,6 +100,8 @@ void display_prompt(void) {
   fflush(stdout);
 }
 
+bool is_cte(char c) { return c >= 0x40 && c <= 0x7E; }
+
 void read_escape(struct shell *shell, char *buffer, size_t *pos, size_t *len) {
   char c = '\x1b';
   // *pos = 0;
@@ -109,7 +111,7 @@ void read_escape(struct shell *shell, char *buffer, size_t *pos, size_t *len) {
   seq[i++] = c;
   if (read(0, &seq[i], 1) == 1 && seq[i] == '[') {
     i++;
-    while ((read(0, &seq[i], 1) == 1) && (!isalnum(seq[i]) && seq[i] != '~')) {
+    while ((read(0, &seq[i], 1) == 1) && (!is_cte(seq[i]) && seq[i] != '~')) {
       // TODO handle overflow
       i++;
     }
@@ -232,7 +234,6 @@ void shell_run(struct shell *shell) {
 
     shell_history_append(shell, line);
     struct token_list *token_lst = tokenize(line, shell->param_registry);
-
     if (token_lst->count == 0) {
       continue;
     }

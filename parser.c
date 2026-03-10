@@ -82,13 +82,10 @@ struct token *lexer_next(struct lexer *l, struct param_registry *params) {
       memcpy(param_name, start, param_len);
       param_name[param_len] = '\0';
 
-      // TODO refactor
       struct param *param = param_registry_find(params, string_new(param_name));
       if (param) {
         tlen += snprintf(tstr + tlen, sizeof(tstr) - tlen, "%s",
                          param->value->value);
-      } else {
-        fprintf(stderr, "parameter expansion error\n");
       }
 
       free(param_name);
