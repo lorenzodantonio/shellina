@@ -239,6 +239,10 @@ void shell_run(struct shell *shell) {
 
     set_canonical_mode();
     struct ast_node *ast = parse(token_lst, 0, token_lst->count);
+    if (!ast) {
+      fprintf(stderr, "syntax error\n");
+      continue;
+    }
     eval(shell, ast);
     ast_free(ast);
 

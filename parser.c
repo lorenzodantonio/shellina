@@ -198,17 +198,41 @@ struct ast_node *parse_assignment(struct token_list *lst, size_t start) {
 }
 
 struct ast_node *parse(struct token_list *lst, size_t start, size_t end) {
+  if (start >= end) {
+    return NULL;
+  }
+
   for (size_t i = start; i < end; i++) {
     if (lst->tokens[i]->type == TOKEN_PIPE) {
       struct ast_node *n = ast_node_new(AST_NODE_PIPE);
-      n->data.child.left = parse(lst, start, i);
-      n->data.child.right = parse(lst, i + 1, end);
+      struct ast_node *left = parse(lst, start, i);
+      if (!left) {
+        return NULL;
+      }
+
+      struct ast_node *right = parse(lst, i + 1, end);
+      if (!right) {
+        free(left);
+        return NULL;
+      }
+      n->data.child.left = left;
+      n->data.child.right = right;
       return n;
     }
     if (lst->tokens[i]->type == TOKEN_AND) {
       struct ast_node *n = ast_node_new(AST_NODE_AND);
-      n->data.child.left = parse(lst, start, i);
-      n->data.child.right = parse(lst, i + 1, end);
+      struct ast_node *left = parse(lst, start, i);
+      if (!left) {
+        return NULL;
+      }
+
+      struct ast_node *right = parse(lst, i + 1, end);
+      if (!right) {
+        free(left);
+        return NULL;
+      }
+      n->data.child.left = left;
+      n->data.child.right = right;
       return n;
     }
   }
