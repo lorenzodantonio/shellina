@@ -7,6 +7,7 @@
 
 struct shell {
   struct history *history;
+  struct history_viewer *history_viewer;
   struct param_registry *param_registry;
   bool raw_mode;
   bool running;

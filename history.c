@@ -5,11 +5,9 @@
 struct history *history_new(size_t capacity) {
   struct history *h = malloc(sizeof(*h));
   h->capacity = capacity;
-  h->cursor = 0;
+  h->commands = calloc(capacity, sizeof(struct string *));
   h->count = 0;
   h->head = 0;
-  h->commands = calloc(capacity, sizeof(struct string *));
-  h->active = true;
   return h;
 }
 
@@ -33,33 +31,54 @@ void history_free(struct history *h) {
   free(h);
 }
 
-struct string *history_next(struct history *history) {
+struct string *history_prev(struct history_viewer *viewer,
+                            struct history *history) {
   if (history->count <= 0) {
     return NULL;
   }
 
-  if (history->active && history->cursor > 1) {
-    history->cursor--;
+  size_t oldest = (history->count < history->capacity) ? 0 : history->head;
+
+  if (!viewer->active) {
+    viewer->active = true;
+    viewer->cursor =
+        (history->head - 1 + history->capacity) % history->capacity;
   } else {
-    history->active = true;
-    history->cursor = history->count;
+    if (viewer->cursor == oldest) {
+      viewer->cursor =
+          (history->head - 1 + history->capacity) % history->capacity;
+    } else {
+      viewer->cursor =
+          (viewer->cursor - 1 + history->capacity) % history->capacity;
+    }
   }
 
-  return history->commands[history->cursor - 1];
+  return history->commands[viewer->cursor];
 }
 
-struct string *history_prev(struct history *history) {
-  if (history->count <= 0 || !history->active) {
+struct string *history_next(struct history_viewer *viewer,
+                            struct history *history) {
+  if (history->count == 0 || !viewer->active) {
     return NULL;
   }
-  if (history->cursor < history->count) {
-    history->cursor++;
+
+  size_t newest = (history->head - 1 + history->capacity) % history->capacity;
+  size_t oldest = (history->count < history->capacity) ? 0 : history->head;
+
+  if (viewer->cursor == newest) {
+    viewer->cursor = oldest;
   } else {
-    history->cursor = 1;
+    viewer->cursor =
+        (viewer->cursor + 1 + history->capacity) % history->capacity;
   }
 
-  // write(1, "\r\x1b[K", 4); // clear
-  // display_prompt();
+  return history->commands[viewer->cursor];
+}
 
-  return history->commands[history->cursor - 1];
+struct history_viewer *history_viewer_new(void) {
+  struct history_viewer *v = malloc(sizeof(*v));
+
+  v->active = false;
+  v->cursor = 0;
+  return v;
 }

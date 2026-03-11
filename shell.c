@@ -20,8 +20,12 @@ struct shell *shell_new(void) {
 
   s->raw_mode = false;
   s->param_registry = param_registry_new(1024);
-  s->history = history_new(1024);
+
+  struct history *h = history_new(1024);
+  s->history = h;
+  s->history_viewer = history_viewer_new();
   s->running = true;
+
   return s;
 }
 
@@ -116,11 +120,22 @@ void read_escape(struct shell *shell, char *buffer, size_t *pos, size_t *len) {
       i++;
     }
     switch (seq[i]) {
-    case 'A':
+    case 'A': {
+      struct string *cmd = history_prev(shell->history_viewer, shell->history);
+      if (!cmd)
+        break;
+      write(1, "\r\x1b[K", 4);
+      display_prompt();
+      strcpy(buffer, cmd->value);
+      write(1, buffer, cmd->len);
+      *pos = cmd->len;
+      *len = cmd->len;
+      break;
+    }
     case 'B': {
-      struct string *(*history_fn_ptr)(struct history *);
-      history_fn_ptr = (seq[i] == 'A') ? history_next : history_prev;
-      struct string *cmd = history_fn_ptr(shell->history);
+      struct string *cmd = history_next(shell->history_viewer, shell->history);
+      if (!cmd)
+        break;
       write(1, "\r\x1b[K", 4);
       display_prompt();
       strcpy(buffer, cmd->value);
@@ -220,7 +235,7 @@ void shell_run(struct shell *shell) {
     buffer[len] = '\0';
     write(1, "\n", 1);
 
-    shell->history->active = false;
+    shell->history_viewer->active = false;
 
     if (pos > 0 && buffer[pos - 1] == '\n') {
       buffer[pos - 1] = '\0';
